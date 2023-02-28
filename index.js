@@ -1,71 +1,87 @@
 // Configuration variables
-const OPT_IN = true; // Set default for Segment.io Destination
+let all_default = false; // Set default integration object value for All destinations when the API call fails
+const OPT_IN = true; // Set default integration object value for Segment.io Destination
 const WEBSITE_WRITE_KEY = "sWc0wPbdtdU9QRRvJrNlow8Hnp7wPXXx"; // Your segment website source write key
+const INDOMAIN_INSTRUMENTATION_URL = "https://cdn.segment.com/analytics.js/v1/" + WEBSITE_WRITE_KEY + "/analytics.min.js"; // Update to your CNAME if using Indomain Instrumentation
 
-// Segment Analytics.js SDK without default .page and .load calls
-!function(){var analytics=window.analytics=window.analytics||[];if(!analytics.initialize)if(analytics.invoked)window.console&&console.error&&console.error("Segment snippet included twice.");else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","once","off","on","addSourceMiddleware","addIntegrationMiddleware","setAnonymousId","addDestinationMiddleware"];analytics.factory=function(e){return function(){var t=Array.prototype.slice.call(arguments);t.unshift(e);analytics.push(t);return analytics}};for(var e=0;e<analytics.methods.length;e++){var key=analytics.methods[e];analytics[key]=analytics.factory(key)}analytics.load=function(key,e){var t=document.createElement("script");t.type="text/javascript";t.async=!0;t.src="https://evs.sdns.prio4.com/yvbu21dbeC/go18rexsDtdqGBkYKzwMq.min.js";var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(t,n);analytics._loadOptions=e};analytics._writeKey="Bj8l9tfy18TcGSOckGO9nm6RGkTWTWLB";analytics._cdn = "https://evs.sdns.prio4.com";analytics.SNIPPET_VERSION="4.15.3";
+// Segment Analytics.js SDK without default .load calls
+!function(){var analytics=window.analytics=window.analytics||[];if(!analytics.initialize)if(analytics.invoked)window.console&&console.error&&console.error("Segment snippet included twice.");else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","once","off","on","addSourceMiddleware","addIntegrationMiddleware","setAnonymousId","addDestinationMiddleware"];analytics.factory=function(e){return function(){var t=Array.prototype.slice.call(arguments);t.unshift(e);analytics.push(t);return analytics}};for(var e=0;e<analytics.methods.length;e++){var key=analytics.methods[e];analytics[key]=analytics.factory(key)}analytics.load=function(key,e){var t=document.createElement("script");t.type="text/javascript";t.async=!0;t.src=INDOMAIN_INSTRUMENTATION_URL;var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(t,n);analytics._loadOptions=e};analytics._writeKey=WEBSITE_WRITE_KEY;;analytics.SNIPPET_VERSION="4.15.3";
+analytics.load(WEBSITE_WRITE_KEY);
 }}();
 
 window.analytics.ready(() => {
     fetchDestinations(WEBSITE_WRITE_KEY).then(
         destinations => {
-            // Grab OptanonConsent cookie value
-            let cookie_OptanonConsent = decodeURIComponent(getCookie("OptanonConsent"));
-            
-            // Check for additional consent
-            if (cookie_OptanonConsent.indexOf('&groups=') > -1) {
-                cookie_OptanonConsent = cookie_OptanonConsent.split('&groups=')[1].split('&')[0];
+            // No OneTrust Cookie Failsafe
+            let consent_onetrust = "";
+
+            // Grab OneTrust Cookie value
+            let cookie_OptanonConsent = getCookie("OptanonConsent");
+            if (typeof cookie_OptanonConsent != 'undefined') {
+                cookie_OptanonConsent = decodeURIComponent(cookie_OptanonConsent);
+                // Get 'groups' from OptanonConsent cookie
+                if (cookie_OptanonConsent.indexOf('&groups=') > -1) {
+                    consent_onetrust = cookie_OptanonConsent.split('&groups=')[1].split('&')[0];
+                }
             }
       
-            // Build Integrations object
+            // Build Integrations object by comparing OneTrust Cookie values to Destinations
             const destinationPreferences = destinations
             .map(function(dest) {
                 // Analytics consent C0002:1
-                if (dest.category === 'Analytics') return { [dest.id]: cookie_OptanonConsent.indexOf('C0002:1') > -1 ? true : false };
+                if (dest.category === 'Analytics') return { [dest.id]: consent_onetrust.indexOf('C0002:1') > -1 ? true : false };
                 // Functional consent C0003:1
-                if (dest.category === 'Personalization') return { [dest.id]: cookie_OptanonConsent.indexOf('C0003:1') > -1 ? true : false };
+                if (dest.category === 'Personalization') return { [dest.id]: consent_onetrust.indexOf('C0003:1') > -1 ? true : false };
                  // Targeting consent C0004:1
-                 if (dest.category === 'Advertising') return { [dest.id]: cookie_OptanonConsent.indexOf('C0004:1') > -1 ? true : false };
+                 if (dest.category === 'Advertising') return { [dest.id]: consent_onetrust.indexOf('C0004:1') > -1 ? true : false };
                 // Social Media consent C0005:1
-                if (dest.category === 'Social Media') return { [dest.id]: cookie_OptanonConsent.indexOf('C0005:1') > -1 ? true : false };
+                if (dest.category === 'Social Media') return { [dest.id]: consent_onetrust.indexOf('C0005:1') > -1 ? true : false };
             })
             .reduce(
                 (acc, val) => {
-                return {
-                    ...val,
-                    ...acc
-                };
+                    return { ...val, ...acc };
                 },
                 { "Segment.io": OPT_IN }
             );
 
-            // Register OneTrust Integration Plugin with .load call
-            window.analytics.register({
-                name: 'OneTrust Integration API',
-                version: '0.1.0',
-                type: 'enrichment',
-                isLoaded: () => true,
-                load: () => Promise.resolve(),
-                // Add Integrations object to every Segment call, add more if needed
-                page: (ctx) => {
-                    ctx.updateEvent(ctx.event.integrations = destinationPreferences)
-                    return ctx
-                },
-                track: (ctx) => {
-                    ctx.updateEvent(ctx.event.integrations = destinationPreferences)
-                    return ctx
-                },
-                identify: (ctx) => {
-                    ctx.updateEvent(ctx.event.integrations = destinationPreferences)
-                    return ctx
-                }
-            })
-              
-            // Send Initial Pageview with .page call
-            analytics.page();
+            // Register the plugin and call the pageview
+            registerAndCall(destinationPreferences);
         }
-    );
+    ).catch(() => {
+        // On API error, still register the plugin and call the pageview with All destination set to default value
+        registerAndCall({
+            "Segment.io": OPT_IN,
+            "All": all_default
+        });
+    });
 });
+
+function registerAndCall(destinationPreferences) {
+    // Register OneTrust Integration Plugin with .load call
+    window.analytics.register({
+        name: 'OneTrust Integration API',
+        version: '0.1.0',
+        type: 'enrichment',
+        isLoaded: () => true,
+        load: () => Promise.resolve(),
+        // Add integrations object to every Segment call, add more types of tracking calls if needed
+        page: (ctx) => {
+            ctx.updateEvent(ctx.event.integrations = destinationPreferences)
+            return ctx
+        },
+        track: (ctx) => {
+            ctx.updateEvent(ctx.event.integrations = destinationPreferences)
+            return ctx
+        },
+        identify: (ctx) => {
+            ctx.updateEvent(ctx.event.integrations = destinationPreferences)
+            return ctx
+        }
+    });
+      
+    // Send Initial Pageview with .page call
+    analytics.page();
+}
 
 // Helper function for Segment Proejct Destination API
 async function fetchDestinations(write_key) {
