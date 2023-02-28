@@ -4,7 +4,7 @@ const OPT_IN = true; // Set default integration object value for Segment.io Dest
 const WEBSITE_WRITE_KEY = "sWc0wPbdtdU9QRRvJrNlow8Hnp7wPXXx"; // Your segment website source write key
 const INDOMAIN_INSTRUMENTATION_URL = "https://cdn.segment.com/analytics.js/v1/" + WEBSITE_WRITE_KEY + "/analytics.min.js"; // Update to your CNAME if using Indomain Instrumentation
 
-// Segment Analytics.js SDK without default .load calls
+// Segment Analytics.js SDK
 !function(){var analytics=window.analytics=window.analytics||[];if(!analytics.initialize)if(analytics.invoked)window.console&&console.error&&console.error("Segment snippet included twice.");else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","once","off","on","addSourceMiddleware","addIntegrationMiddleware","setAnonymousId","addDestinationMiddleware"];analytics.factory=function(e){return function(){var t=Array.prototype.slice.call(arguments);t.unshift(e);analytics.push(t);return analytics}};for(var e=0;e<analytics.methods.length;e++){var key=analytics.methods[e];analytics[key]=analytics.factory(key)}analytics.load=function(key,e){var t=document.createElement("script");t.type="text/javascript";t.async=!0;t.src=INDOMAIN_INSTRUMENTATION_URL;var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(t,n);analytics._loadOptions=e};analytics._writeKey=WEBSITE_WRITE_KEY;;analytics.SNIPPET_VERSION="4.15.3";
 analytics.load(WEBSITE_WRITE_KEY);
 }}();
